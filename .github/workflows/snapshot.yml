@@ -1,0 +1,55 @@
+name: Create Snapshot Release
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  snapshot:
+    if: |
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/snapshot') &&
+      (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Configure npm auth (token + provenance)
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          echo "provenance=true" >> ~/.npmrc
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Get snapshot name
+        id: get_snapshot_name
+        run: echo "name=$(echo '${{ github.event.comment.body }}' | cut -d' ' -f2)" >> $GITHUB_OUTPUT
+
+      - name: Create and Publish Snapshot
+        uses: the-guild-org/changesets-snapshot-action@v0.0.2
+        with:
+          tag: ${{ steps.get_snapshot_name.outputs.name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

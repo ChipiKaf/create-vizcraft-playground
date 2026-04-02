@@ -10,6 +10,9 @@
     "index.js",
     "template"
   ],
+  "scripts": {
+    "changeset": "changeset"
+  },
   "keywords": [
     "vizcraft",
     "playground",
@@ -17,5 +20,21 @@
     "scaffold",
     "create"
   ],
-  "license": "MIT"
+  "author": {
+    "name": "Chipili Kafwilo",
+    "email": "ckafwilo@gmail.com",
+    "url": "https://chipilidev.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChipiKaf/create-vizcraft-playground.git"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.5.2",
+    "@changesets/cli": "^2.29.6"
+  },
+  "engines": {
+    "node": ">=20"
+  }
 }
