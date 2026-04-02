@@ -1,0 +1,21 @@
+{
+  "name": "create-vizcraft-playground",
+  "version": "1.0.0",
+  "description": "Scaffold a new VizCraft interactive visualization playground",
+  "type": "module",
+  "bin": {
+    "create-vizcraft-playground": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "template"
+  ],
+  "keywords": [
+    "vizcraft",
+    "playground",
+    "visualization",
+    "scaffold",
+    "create"
+  ],
+  "license": "MIT"
+}
