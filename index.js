@@ -160,6 +160,10 @@ export default playgroundConfig;
   console.log("");
   console.log('    npm run generate my-concept --category "My Category"');
   console.log("");
+  console.log("  Or scaffold a sandbox plugin (dynamic components, flow engine):");
+  console.log("");
+  console.log('    npm run generate my-concept --sandbox --category "My Category"');
+  console.log("");
 
   rl.close();
 }
