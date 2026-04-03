@@ -1,63 +1,65 @@
 # create-vizcraft-playground
 
-Scaffold a new VizCraft interactive visualization playground.
+Scaffold a new [VizCraft](https://www.npmjs.com/package/vizcraft) interactive visualization playground in seconds.
 
-## What this package does
+## Usage
 
-- Creates a ready-to-run VizCraft + React + TypeScript playground.
-- Includes plugin scaffolding scripts for linear and sandbox-style visualizations.
-- Ships with Changesets + GitHub Actions release automation.
+```bash
+npx create-vizcraft-playground my-playground
+```
+
+Or without a project name — the CLI will prompt you:
+
+```bash
+npx create-vizcraft-playground
+```
+
+The scaffolder will ask for:
+
+- **Project directory name**
+- **Playground title** shown on the landing page
+- **Subtitle** — one-liner description
+- **Accent colour** — hex value for the primary theme colour
+
+Then just install and run:
+
+```bash
+cd my-playground
+npm install
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173).
+
+## Re-running the setup wizard
+
+You can re-configure the title, subtitle, and accent colour at any time:
+
+```bash
+npm run init
+```
+
+This regenerates `src/playground.config.ts`.
+
+## Adding a plugin
+
+Generate a new visualization plugin:
+
+```bash
+npm run generate <plugin-name> --category "Category Name"
+```
+
+Example:
+
+```bash
+npm run generate supply-demand --category "Microeconomics"
+```
+
+This creates `src/plugins/<plugin-name>/` and wires it into the registry automatically. See [template/README.md](template/README.md) for full plugin docs.
 
 ## Requirements
 
 - Node.js 20+
-- npm
-
-## Local development
-
-1. Install dependencies:
-
-   npm install
-
-2. Run the package locally (optional):
-
-   node index.js my-playground
-
-## Repository scripts
-
-- npm run changeset: create a changeset entry for release notes and versioning.
-
-## Release flow (Changesets)
-
-This repository uses `.github/workflows/release.yml` to:
-
-- Open a release PR when changesets are present.
-- Publish to npm after the release PR is merged.
-
-### One-time repository setup
-
-1. Add an Actions secret named `NPM_TOKEN` with publish access to npm.
-2. In GitHub repository settings:
-   - Go to Settings -> Actions -> General.
-   - Set Workflow permissions to Read and write permissions.
-   - Enable Allow GitHub Actions to create and approve pull requests.
-
-If your organization blocks default Actions PR permissions, create a PAT and use a `GH_RELEASE_TOKEN` secret for release jobs.
-
-## Creating a changeset
-
-Interactive:
-
-npm run changeset
-
-Non-interactive (manual file):
-
-1. Create a markdown file in `.changeset/`.
-2. Frontmatter format:
-
-   ---
-   "create-vizcraft-playground": patch
-   ---
 
 3. Add a short summary sentence.
 
