@@ -35,7 +35,17 @@ For example:
 npm run generate supply-demand --category "Microeconomics"
 ```
 
-This creates `src/plugins/<plugin-name>/` with six files and wires it into the registry automatically. If the category doesn't exist yet, it will be created.
+This creates `src/plugins/<plugin-name>/` and wires it into the registry automatically. If the category doesn't exist yet, it will be created.
+
+### Generate a sandbox plugin
+
+Use the sandbox option when you want dynamic infrastructure toggles and adaptive step flows:
+
+```bash
+npm run generate cloud-lab --category "Systems" --sandbox
+```
+
+The generator includes sandbox-aware defaults and structure for component toggles, step mapping, and interaction-focused scenes.
 
 ### Plugin structure
 
