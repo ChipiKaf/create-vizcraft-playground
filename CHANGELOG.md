@@ -1,5 +1,11 @@
 # create-vizcraft-playground
 
+## 0.2.0
+
+### Minor Changes
+
+- [`de0851e`](https://github.com/ChipiKaf/create-vizcraft-playground/commit/de0851e9bf1d936d44f30d9a456fa8837ff434f3) Thanks [@ChipiKaf](https://github.com/ChipiKaf)! - Add timeline template
+
 ## 0.1.1
 
 ### Patch Changes
