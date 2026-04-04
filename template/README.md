@@ -47,6 +47,16 @@ npm run generate cloud-lab --category "Systems" --sandbox
 
 The generator includes sandbox-aware defaults and structure for component toggles, step mapping, and interaction-focused scenes.
 
+### Generate a timeline plugin
+
+Use the timeline option when you want a progressive-reveal timeline with animated nodes, a progress bar, and declarative steps auto-generated from a data array:
+
+```bash
+npm run generate historical-events --category "History" --timeline
+```
+
+A timeline plugin generates 8 files (the standard 6 plus `flow-engine.ts` and `data.ts`). Steps are built dynamically from the items array in `data.ts` — adding an item automatically adds a step.
+
 ### Plugin structure
 
 | File | Purpose |

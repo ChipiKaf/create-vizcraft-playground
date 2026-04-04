@@ -74,6 +74,24 @@ A sandbox plugin differs from a standard one in a few key ways:
 
 Use sandbox plugins when you want an interactive scene where composition affects both the narrative and the visualization.
 
+### Timeline plugins
+
+Use the `--timeline` flag to generate a progressive-reveal timeline plugin with animated nodes, a colored progress bar, auto-pan, and declarative steps generated from a data array:
+
+```bash
+npm run generate historical-events --category "History" --timeline
+```
+
+A timeline plugin differs from the standard one in a few key ways:
+
+- **Declarative flow engine** — a `flow-engine.ts` file defines steps as data. Per-item steps are auto-generated from the items array so adding an item automatically adds a step.
+- **Data file** — a `data.ts` file contains the timeline items, category colors, era ranges, and connection definitions.
+- **Progressive reveal** — items light up one-by-one with a 3-state system (reached / active / upcoming) and a colored progress bar tracks progress.
+- **Animated nodes** — the active node rises up with an `animateTo()` entrance and the camera auto-pans via `zoomToNode()`.
+- **8 files** instead of the standard 6, including `flow-engine.ts` and `data.ts`.
+
+Use timeline plugins when you want a chronological walkthrough with per-item detail cards and connection overlays.
+
 ## Requirements
 
 - Node.js 20+
