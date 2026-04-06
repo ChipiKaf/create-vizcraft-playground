@@ -12,6 +12,7 @@ let pluginName = null;
 let categoryName = null;
 let isSandbox = false;
 let isTimeline = false;
+let isComparison = false;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--category" || args[i] === "-c") {
@@ -20,6 +21,8 @@ for (let i = 0; i < args.length; i++) {
     isSandbox = true;
   } else if (args[i] === "--timeline" || args[i] === "-t") {
     isTimeline = true;
+  } else if (args[i] === "--comparison" || args[i] === "-l") {
+    isComparison = true;
   } else if (!args[i].startsWith("-")) {
     pluginName = args[i];
   }
@@ -27,19 +30,22 @@ for (let i = 0; i < args.length; i++) {
 
 if (!pluginName) {
   console.error(
-    "Usage: npm run generate <plugin-name> [--category \"Category Name\"] [--sandbox | --timeline]\n" +
+    "Usage: npm run generate <plugin-name> [--category \"Category Name\"] [--sandbox | --timeline | --comparison]\n" +
       "       Name must be kebab-case, e.g. npm run generate api-gateway\n" +
-      "       --category  / -c   Existing or new category to place the plugin in\n" +
-      "       --sandbox   / -s   Generate a sandbox plugin with declarative flow engine,\n" +
-      "                          Controls panel, and dynamic component toggling\n" +
-      "       --timeline  / -t   Generate a timeline plugin with progressive reveal,\n" +
-      "                          animated nodes, progress bar, and declarative steps",
+      "       --category    / -c   Existing or new category to place the plugin in\n" +
+      "       --sandbox     / -s   Generate a sandbox plugin with declarative flow engine,\n" +
+      "                            Controls panel, and dynamic component toggling\n" +
+      "       --timeline    / -t   Generate a timeline plugin with progressive reveal,\n" +
+      "                            animated nodes, progress bar, and declarative steps\n" +
+      "       --comparison  / -l   Generate a comparison-lab plugin using the shared\n" +
+      "                            lab-engine (variant selection, strategy profiles,\n" +
+      "                            declarative flow + animation via useLabAnimation)",
   );
   process.exit(1);
 }
 
-if (isSandbox && isTimeline) {
-  console.error("Error: --sandbox and --timeline are mutually exclusive.");
+if ([isSandbox, isTimeline, isComparison].filter(Boolean).length > 1) {
+  console.error("Error: --sandbox, --timeline, and --comparison are mutually exclusive.");
   process.exit(1);
 }
 
@@ -270,6 +276,111 @@ const ${camelName}Slice = createSlice({
 });
 
 export const { patchState, reset } = ${camelName}Slice.actions;
+export default ${camelName}Slice.reducer;
+`;
+} else if (isComparison) {
+sliceContent = `import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import type { LabState } from "../../lib/lab-engine";
+
+/* ── Variant identifiers ─────────────────────────────── */
+export type VariantKey = "variant-a" | "variant-b";
+// TODO: add more variant keys as needed
+
+/* ── Per-variant profile ─────────────────────────────── */
+export interface VariantProfile {
+  key: VariantKey;
+  label: string;
+  color: string;
+  description: string;
+}
+
+export const VARIANT_PROFILES: Record<VariantKey, VariantProfile> = {
+  "variant-a": {
+    key: "variant-a",
+    label: "Variant A",
+    color: "#3b82f6",
+    description: "Describe variant A's approach.",
+  },
+  "variant-b": {
+    key: "variant-b",
+    label: "Variant B",
+    color: "#22c55e",
+    description: "Describe variant B's approach.",
+  },
+};
+
+/* ── State shape ─────────────────────────────────────── */
+export interface ${pascalName}State extends LabState {
+  variant: VariantKey;
+
+  /* derived metrics (recomputed by computeMetrics) */
+  latencyMs: number;
+  throughput: number;
+}
+
+/* ── Metrics model ───────────────────────────────────── */
+export function computeMetrics(state: ${pascalName}State) {
+  // TODO: compute metrics based on active variant
+  if (state.variant === "variant-a") {
+    state.latencyMs = 50;
+    state.throughput = 1000;
+  } else {
+    state.latencyMs = 120;
+    state.throughput = 2000;
+  }
+}
+
+export const initialState: ${pascalName}State = {
+  variant: "variant-a",
+  latencyMs: 50,
+  throughput: 1000,
+
+  hotZones: [],
+  explanation: "Welcome — select a variant and step through to compare.",
+  phase: "overview",
+};
+
+computeMetrics(initialState);
+
+/* ── Slice ───────────────────────────────────────────── */
+const ${camelName}Slice = createSlice({
+  name: "${camelName}",
+  initialState,
+  reducers: {
+    reset: () => {
+      const s = { ...initialState };
+      computeMetrics(s);
+      return s;
+    },
+    softResetRun: (state) => {
+      state.hotZones = [];
+      state.explanation = VARIANT_PROFILES[state.variant].description;
+      state.phase = "overview";
+      computeMetrics(state);
+    },
+    patchState(state, action: PayloadAction<Partial<${pascalName}State>>) {
+      Object.assign(state, action.payload);
+    },
+    recalcMetrics(state) {
+      computeMetrics(state);
+    },
+    setVariant(state, action: PayloadAction<VariantKey>) {
+      state.variant = action.payload;
+      state.hotZones = [];
+      state.explanation = VARIANT_PROFILES[action.payload].description;
+      state.phase = "overview";
+      computeMetrics(state);
+    },
+  },
+});
+
+export const {
+  reset,
+  softResetRun,
+  patchState,
+  recalcMetrics,
+  setVariant,
+} = ${camelName}Slice.actions;
 export default ${camelName}Slice.reducer;
 `;
 } else {
@@ -626,6 +737,38 @@ export const use${pascalName}Animation = (
   return { runtime, currentStep };
 };
 `;
+} else if (isComparison) {
+hookContent = `import {
+  patchState,
+  softResetRun,
+  recalcMetrics,
+  type ${pascalName}State,
+} from "./${camelName}Slice";
+import { STEPS, buildSteps, expandToken, type StepKey } from "./flow-engine";
+import {
+  useLabAnimation,
+  type Signal,
+  type UseLabAnimationConfig,
+} from "../../lib/lab-engine";
+
+export type { Signal };
+
+const labConfig: UseLabAnimationConfig<${pascalName}State, StepKey> = {
+  selector: (root) => root.${camelName} as ${pascalName}State,
+  allSteps: STEPS,
+  buildSteps,
+  expandToken,
+  actions: () => ({
+    resetRun: { create: () => softResetRun(), terminal: true },
+    // TODO: add more action mappings as needed
+  }),
+  recalcMetrics: () => recalcMetrics(),
+  patchState: (p) => patchState(p),
+};
+
+export const use${pascalName}Animation = (onAnimationComplete?: () => void) =>
+  useLabAnimation(labConfig, onAnimationComplete);
+`;
 } else {
 hookContent = `import { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -818,6 +961,7 @@ const ${pascalName}Visualization: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
   const pzRef = useRef<PanZoomController | null>(null);
+  const viewportRef = useRef<{ zoom: number; pan: { x: number; y: number } } | null>(null);
   const lastAnimatedItemRef = useRef<string | null>(null);
   const isFirstMountRef = useRef(true);
 
@@ -1117,7 +1261,7 @@ const ${pascalName}Visualization: React.FC<Props> = ({
           panZoom: true,
         }) ?? null;
     } else {
-      const saved = pzRef.current?.getState() ?? null;
+      const saved = viewportRef.current;
       builderRef.current?.destroy();
       builderRef.current = scene;
       pzRef.current =
@@ -1128,6 +1272,10 @@ const ${pascalName}Visualization: React.FC<Props> = ({
           initialPan: saved?.pan ?? { x: 0, y: 0 },
         }) ?? null;
     }
+    const unsub = pzRef.current?.onChange((s) => {
+      viewportRef.current = s;
+    });
+    return () => { unsub?.(); };
   }, [scene]);
 
   useEffect(() => {
@@ -1222,6 +1370,168 @@ const ${pascalName}Visualization: React.FC<Props> = ({
 
 export default ${pascalName}Visualization;
 `;
+} else if (isComparison) {
+mainContent = `import React, { useLayoutEffect, useRef, useEffect } from "react";
+import {
+  viz,
+  type PanZoomController,
+  type SignalOverlayParams,
+} from "vizcraft";
+import {
+  useConceptModal,
+  ConceptPills,
+  PluginLayout,
+  StageHeader,
+  StatBadge,
+  SidePanel,
+  SideCard,
+  CanvasStage,
+} from "../../components/plugin-kit";
+import { concepts, type ConceptKey } from "./concepts";
+import { use${pascalName}Animation, type Signal } from "./use${pascalName}Animation";
+import { VARIANT_PROFILES, type ${pascalName}State } from "./${camelName}Slice";
+import { buildSteps } from "./flow-engine";
+import "./main.scss";
+
+interface Props {
+  onAnimationComplete?: () => void;
+}
+
+const W = 900;
+const H = 600;
+
+const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) => {
+  const { runtime, signals } =
+    use${pascalName}Animation(onAnimationComplete);
+  const { openConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
+  const containerRef = useRef<HTMLDivElement>(null!);
+  const builderRef = useRef<ReturnType<typeof viz> | null>(null);
+  const pzRef = useRef<PanZoomController | null>(null);
+  const viewportRef = useRef<{
+    zoom: number;
+    pan: { x: number; y: number };
+  } | null>(null);
+
+  const st = runtime as ${pascalName}State;
+  const { explanation, hotZones, phase, variant } = st;
+  const profile = VARIANT_PROFILES[variant];
+  const hot = (zone: string) => hotZones.includes(zone);
+
+  /* ── Build VizCraft scene ─────────────────────────────── */
+  const scene = (() => {
+    const b = viz().view(W, H);
+
+    // TODO: build your nodes / edges dynamically based on \`variant\`
+    b.node("node-a")
+      .at(200, 300)
+      .rect(140, 60, 12)
+      .fill(hot("node-a") ? "#1e40af" : "#0f172a")
+      .stroke(hot("node-a") ? "#60a5fa" : "#334155", 2)
+      .label("Node A", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
+
+    b.node("node-b")
+      .at(650, 300)
+      .rect(140, 60, 12)
+      .fill(hot("node-b") ? "#065f46" : "#0f172a")
+      .stroke(hot("node-b") ? "#34d399" : "#334155", 2)
+      .label("Node B", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
+
+    b.edge("node-a", "node-b", "edge-ab")
+      .stroke("#475569", 2)
+      .animate("flow", { duration: "3s" });
+
+    // ── Signals ──────────────────────────────────────────
+    if (signals.length > 0) {
+      b.overlay((o) => {
+        signals.forEach((sig: Signal) => {
+          const { id, colorClass, ...params } = sig;
+          o.add(
+            "signal",
+            params as SignalOverlayParams,
+            { key: id, className: colorClass },
+          );
+        });
+      });
+    }
+
+    return b;
+  })();
+
+  /* ── Mount / destroy VizCraft scene ─────────────────── */
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+    const saved = viewportRef.current;
+    builderRef.current?.destroy();
+    builderRef.current = scene;
+    pzRef.current =
+      scene.mount(containerRef.current, {
+        autoplay: true,
+        panZoom: true,
+        initialZoom: saved?.zoom ?? 1,
+        initialPan: saved?.pan ?? { x: 0, y: 0 },
+      }) ?? null;
+    const unsub = pzRef.current?.onChange((s) => {
+      viewportRef.current = s;
+    });
+    return () => { unsub?.(); };
+  }, [scene]);
+
+  useEffect(() => {
+    return () => {
+      builderRef.current?.destroy();
+      builderRef.current = null;
+      pzRef.current = null;
+    };
+  }, []);
+
+  /* ── Pill definitions ───────────────────────────────── */
+  const pills = [
+    { key: "overview", label: "${pascalName}", color: "#93c5fd", borderColor: "#3b82f6" },
+  ];
+
+  /* ── Render ─────────────────────────────────────────── */
+  return (
+    <div className="${pluginName}-root ${pluginName}-phase--\${phase}">
+      <PluginLayout
+        toolbar={<ConceptPills pills={pills} onOpen={openConcept} />}
+        canvas={
+          <div className="${pluginName}-stage">
+            <StageHeader
+              title="${pascalName}"
+              subtitle={\`Comparing: \${profile.label}\`}
+            >
+              <StatBadge
+                label="Variant"
+                value={profile.label}
+                className={\`${pluginName}-phase ${pluginName}-phase--\${phase}\`}
+              />
+              <StatBadge label="Latency" value={\`\${st.latencyMs}ms\`} />
+              <StatBadge label="Throughput" value={\`\${st.throughput} rps\`} />
+            </StageHeader>
+            <CanvasStage canvasRef={containerRef} />
+          </div>
+        }
+        sidebar={
+          <SidePanel>
+            <SideCard label="What's happening" variant="explanation">
+              <p>{explanation}</p>
+            </SideCard>
+            <SideCard label="Active Variant" variant="info">
+              <p style={{ color: profile.color, fontWeight: 600 }}>
+                {profile.label}
+              </p>
+              <p>{profile.description}</p>
+            </SideCard>
+          </SidePanel>
+        }
+      />
+      <ConceptModal />
+    </div>
+  );
+};
+
+export default ${pascalName}Visualization;
+`;
 } else {
 mainContent = `import React, { useLayoutEffect, useRef, useEffect } from "react";
 import {
@@ -1257,6 +1567,7 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
   const pzRef = useRef<PanZoomController | null>(null);
+  const viewportRef = useRef<{ zoom: number; pan: { x: number; y: number } } | null>(null);
 
   const { explanation, hotZones } = runtime;
   const hot = (zone: string) => hotZones.includes(zone);
@@ -1301,7 +1612,7 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
   /* ── Mount / destroy VizCraft scene ─────────────────── */
   useLayoutEffect(() => {
     if (!containerRef.current) return;
-    const saved = pzRef.current?.getState() ?? null;
+    const saved = viewportRef.current;
     builderRef.current?.destroy();
     builderRef.current = scene;
     pzRef.current =
@@ -1311,6 +1622,10 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
         initialZoom: saved?.zoom ?? 1,
         initialPan: saved?.pan ?? { x: 0, y: 0 },
       }) ?? null;
+    const unsub = pzRef.current?.onChange((s) => {
+      viewportRef.current = s;
+    });
+    return () => { unsub?.(); };
   }, [scene]);
 
   useEffect(() => {
@@ -1579,6 +1894,78 @@ scssContent = `.${pluginName}-root {
   }
 }
 `;
+} else if (isComparison) {
+scssContent = `.${pluginName}-root {
+  --${pluginName}-bg: #020617;
+  --${pluginName}-panel: rgba(7, 17, 34, 0.88);
+  --${pluginName}-border: rgba(148, 163, 184, 0.18);
+  --${pluginName}-text: #e2e8f0;
+  --${pluginName}-muted: #94a3b8;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--${pluginName}-text);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(20, 184, 166, 0.12), transparent 30%),
+    linear-gradient(180deg, #020617 0%, #071325 100%);
+}
+
+/* ── Stage ──────────────────────────────────────────── */
+.${pluginName}-stage {
+  background: var(--${pluginName}-panel);
+  border: 1px solid var(--${pluginName}-border);
+  box-shadow: 0 20px 42px -28px rgba(0, 0, 0, 0.7);
+  border-radius: 24px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Phase colours ──────────────────────────────────── */
+.${pluginName}-phase--overview .vc-stat-badge__value { color: #fbbf24; }
+.${pluginName}-phase--traffic .vc-stat-badge__value { color: #60a5fa; }
+.${pluginName}-phase--comparison .vc-stat-badge__value { color: #14b8a6; }
+.${pluginName}-phase--summary .vc-stat-badge__value { color: #86efac; }
+
+/* ── Controls ────────────────────────────────────────── */
+.${pluginName}-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.${pluginName}-controls__btn {
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.${pluginName}-controls__btn:hover {
+  background: rgba(51, 65, 85, 0.7);
+}
+.${pluginName}-controls__btn--active {
+  border-color: currentColor;
+  background: rgba(51, 65, 85, 0.5);
+  font-weight: 700;
+}
+
+.${pluginName}-controls__sep {
+  width: 1px;
+  height: 1.2rem;
+  background: rgba(148, 163, 184, 0.2);
+}
+`;
 } else {
 scssContent = `.${pluginName}-root {
   --${pluginName}-bg: #020617;
@@ -1693,6 +2080,45 @@ const ${pascalName}Plugin: DemoPlugin<
   reducer: ${camelName}Reducer,
   Component: ${pascalName}Visualization,
   restartConfig: { text: "Restart", color: "#312e81" },
+  getSteps: (state: ${pascalName}State): DemoStep[] => buildSteps(state),
+  init: (dispatch) => {
+    dispatch(reset());
+  },
+  selector: (state: LocalRootState) => state.${camelName},
+};
+
+export { buildSteps };
+export type { StepKey, TaggedStep };
+export default ${pascalName}Plugin;
+`;
+} else if (isComparison) {
+indexContent = `import type { Action, Dispatch } from "@reduxjs/toolkit";
+import type { DemoPlugin, DemoStep } from "../../types/ModelPlugin";
+import ${pascalName}Visualization from "./main";
+import ${pascalName}Controls from "./controls";
+import ${camelName}Reducer, {
+  type ${pascalName}State,
+  initialState,
+  reset,
+} from "./${camelName}Slice";
+import { buildSteps, type StepKey, type TaggedStep } from "./flow-engine";
+
+type LocalRootState = { ${camelName}: ${pascalName}State };
+
+const ${pascalName}Plugin: DemoPlugin<
+  ${pascalName}State,
+  Action,
+  LocalRootState,
+  Dispatch<Action>
+> = {
+  id: "${pluginName}",
+  name: "${pascalName}",
+  description: "Describe what this comparison lab teaches.",
+  initialState,
+  reducer: ${camelName}Reducer,
+  Component: ${pascalName}Visualization,
+  Controls: ${pascalName}Controls,
+  restartConfig: { text: "Replay", color: "#3b82f6" },
   getSteps: (state: ${pascalName}State): DemoStep[] => buildSteps(state),
   init: (dispatch) => {
     dispatch(reset());
@@ -2405,6 +2831,168 @@ fs.writeFileSync(path.join(targetDir, "data.ts"), dataContent);
 } // end timeline-only files
 
 /* ================================================================
+   7d. (Comparison only) Flow Engine  — flow-engine.ts
+   ================================================================ */
+if (isComparison) {
+const flowEngineContent = `import type { ${pascalName}State } from "./${camelName}Slice";
+import {
+  buildSteps as genericBuildSteps,
+  executeFlow as genericExecuteFlow,
+  type FlowBeat as GenericFlowBeat,
+  type StepDef as GenericStepDef,
+  type TaggedStep as GenericTaggedStep,
+  type FlowExecutorDeps as GenericFlowExecutorDeps,
+} from "../../lib/lab-engine";
+
+/* ══════════════════════════════════════════════════════════
+   ${pascalName} Lab — Declarative Flow Engine
+
+   Uses the shared lab-engine for build/execute logic.
+   This file defines the plugin-specific steps, tokens,
+   and type aliases.
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Specialised type aliases ──────────────────────────── */
+
+export type FlowBeat = GenericFlowBeat<${pascalName}State>;
+export type StepDef = GenericStepDef<${pascalName}State, StepKey>;
+export type TaggedStep = GenericTaggedStep<StepKey>;
+export type FlowExecutorDeps = GenericFlowExecutorDeps<${pascalName}State>;
+
+/* ── Token expansion ─────────────────────────────────── */
+
+export function expandToken(token: string, _state: ${pascalName}State): string[] {
+  // TODO: expand $-prefixed tokens to runtime node IDs
+  // e.g. if (token === "$clients") return state.clients.map(c => c.id);
+  return [token];
+}
+
+/* ── Step keys ───────────────────────────────────────── */
+
+export type StepKey = "overview" | "send-traffic" | "observe-metrics" | "summary";
+// TODO: add more step keys as needed
+
+/* ── Step Configuration ──────────────────────────────── */
+
+export const STEPS: StepDef[] = [
+  {
+    key: "overview",
+    label: "Architecture Overview",
+    nextButton: "Send Traffic",
+    action: "resetRun",
+    explain: (s) =>
+      \`\${s.variant === "variant-a" ? "Variant A" : "Variant B"} selected. Step through to compare.\`,
+  },
+  {
+    key: "send-traffic",
+    label: "Send Traffic",
+    processingText: "Sending...",
+    nextButtonColor: "#2563eb",
+    phase: "traffic",
+    flow: [
+      {
+        from: "node-a",
+        to: "node-b",
+        duration: 700,
+        explain: "Requests flow from A to B.",
+      },
+    ],
+    recalcMetrics: true,
+    explain: (s) =>
+      \`Throughput: \${s.throughput} rps — Latency: \${s.latencyMs}ms.\`,
+  },
+  {
+    key: "observe-metrics",
+    label: "Observe Metrics",
+    nextButtonColor: "#2563eb",
+    recalcMetrics: true,
+    delay: 500,
+    phase: "comparison",
+    finalHotZones: ["node-b"],
+    explain: (s) =>
+      \`\${s.variant === "variant-a" ? "Variant A" : "Variant B"} — \${s.throughput} rps at \${s.latencyMs}ms latency.\`,
+  },
+  {
+    key: "summary",
+    label: "Summary",
+    phase: "summary",
+    explain: (s) =>
+      \`Comparison complete. Try switching variants and replaying.\`,
+  },
+];
+
+/* ── Build active steps ──────────────────────────────── */
+
+export function buildSteps(state: ${pascalName}State): TaggedStep[] {
+  return genericBuildSteps(STEPS, state);
+}
+
+/* ── Execute flow ────────────────────────────────────── */
+
+export async function executeFlow(
+  beats: FlowBeat[],
+  deps: FlowExecutorDeps,
+): Promise<void> {
+  return genericExecuteFlow(beats, deps, expandToken);
+}
+`;
+
+fs.writeFileSync(path.join(targetDir, "flow-engine.ts"), flowEngineContent);
+
+/* ================================================================
+   7e. (Comparison only) Controls  — controls.tsx
+   ================================================================ */
+const controlsContent = `import React from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { type RootState } from "../../store/store";
+import { resetSimulation } from "../../store/slices/simulationSlice";
+import {
+  setVariant,
+  VARIANT_PROFILES,
+  type ${pascalName}State,
+  type VariantKey,
+} from "./${camelName}Slice";
+
+const variantKeys = Object.keys(VARIANT_PROFILES) as VariantKey[];
+
+const ${pascalName}Controls: React.FC = () => {
+  const dispatch = useDispatch();
+  const { variant } = useSelector(
+    (state: RootState) => state.${camelName},
+  ) as ${pascalName}State;
+
+  const handleSwitch = (key: VariantKey) => {
+    if (key === variant) return;
+    dispatch(setVariant(key));
+    dispatch(resetSimulation());
+  };
+
+  return (
+    <div className="${pluginName}-controls">
+      {variantKeys.map((key) => {
+        const profile = VARIANT_PROFILES[key];
+        return (
+          <button
+            key={key}
+            className={\`${pluginName}-controls__btn\${key === variant ? " ${pluginName}-controls__btn--active" : ""}\`}
+            style={key === variant ? { color: profile.color, borderColor: profile.color } : {}}
+            onClick={() => handleSwitch(key)}
+          >
+            {profile.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+export default ${pascalName}Controls;
+`;
+
+fs.writeFileSync(path.join(targetDir, "controls.tsx"), controlsContent);
+} // end comparison-only files
+
+/* ================================================================
    9. Update registry.ts — add import + wire into category
    ================================================================ */
 const registryPath = path.join(__dirname, "../src/registry.ts");
@@ -2514,7 +3102,7 @@ if (fs.existsSync(registryPath)) {
   );
 }
 
-const modeLabel = isSandbox ? 'sandbox ' : isTimeline ? 'timeline ' : '';
+const modeLabel = isSandbox ? 'sandbox ' : isTimeline ? 'timeline ' : isComparison ? 'comparison-lab ' : '';
 console.log("");
 console.log(
   '✔ Created ' + modeLabel + 'plugin "' + pluginName + '" in src/plugins/' + pluginName,
@@ -2535,6 +3123,10 @@ if (isTimeline) {
   console.log("    • flow-engine.ts      — Declarative step config (timeline)");
   console.log("    • data.ts             — Timeline items, categories, connections");
 }
+if (isComparison) {
+  console.log("    • flow-engine.ts      — Lab-engine step & flow config");
+  console.log("    • controls.tsx        — Variant selector panel");
+}
 console.log("");
 console.log("  Next steps:");
 if (isSandbox) {
@@ -2549,6 +3141,13 @@ if (isSandbox) {
   console.log("    3. Steps auto-generate from items — customise labels in flow-engine.ts");
   console.log("    4. Add concept pills & definitions in concepts.tsx");
   console.log("    5. Customise node tooltips and sidebar detail in main.tsx");
+} else if (isComparison) {
+  console.log("    1. Define VariantKey + VARIANT_PROFILES in " + camelName + "Slice.ts");
+  console.log("    2. Implement computeMetrics() per variant");
+  console.log("    3. Define steps & flow beats in STEPS (flow-engine.ts)");
+  console.log("    4. Build dynamic scene in main.tsx (nodes adapt to selected variant)");
+  console.log("    5. Add concept pills & definitions in concepts.tsx");
+  console.log("    6. Uses shared lib/lab-engine — animation hook is ~30 lines");
 } else {
   console.log("    1. Define your VizCraft nodes/edges in main.tsx");
   console.log("    2. Add step animations in use" + pascalName + "Animation.ts");
