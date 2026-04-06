@@ -1,5 +1,11 @@
 # create-vizcraft-playground
 
+## 0.3.0
+
+### Minor Changes
+
+- [`0cfbc29`](https://github.com/ChipiKaf/create-vizcraft-playground/commit/0cfbc29ed85fc78cd01f8c8c41557803e24a3edd) Thanks [@ChipiKaf](https://github.com/ChipiKaf)! - Introduce new lab template
+
 ## 0.2.0
 
 ### Minor Changes
